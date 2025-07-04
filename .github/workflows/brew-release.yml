@@ -1,0 +1,81 @@
+name: Update Homebrew Formula on Release
+
+on:
+  release:
+    types: [published] # Trigger this workflow when a new release is published
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create/update files and push
+      pull-requests: write # Needed if you want to create a pull request
+
+    steps:
+      - name: Checkout Homebrew Tap Repository
+        uses: actions/checkout@v4
+        with:
+          repository: gambhirsharma/homebrew-lino # Specify your Homebrew tap repo
+          ref: main # The branch to checkout in your tap repo
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }} # Use a PAT for access
+
+      - name: Get Release Information
+        id: get_release_info
+        run: |
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          # Assume tag is like v1.2.3, remove 'v' for Homebrew version
+          VERSION="${RELEASE_TAG#v}"
+          # Get the URL of the source archive (usually .tar.gz)
+          TARBALL_URL="${{ github.event.release.tarball_url }}"
+
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "TARBALL_URL=${TARBALL_URL}" >> $GITHUB_OUTPUT
+
+      - name: Download and Calculate SHA256
+        id: calculate_sha256
+        run: |
+          wget "${{ steps.get_release_info.outputs.TARBALL_URL }}" -O your-project-source.tar.gz
+          SHA256_CHECKSUM=$(sha256sum your-project-source.tar.gz | awk '{print $1}')
+          echo "SHA256=${SHA256_CHECKSUM}" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew Formula File
+        run: |
+          FORMULA_FILE="Formula/your-project.rb" # Path to your formula in the tap
+          VERSION="${{ steps.get_release_info.outputs.VERSION }}"
+          RELEASE_TAG="${{ steps.get_release_info.outputs.RELEASE_TAG }}"
+          TARBALL_URL="${{ steps.get_release_info.outputs.TARBALL_URL }}"
+          SHA256_CHECKSUM="${{ steps.calculate_sha256.outputs.SHA256 }}"
+
+          echo "Updating $FORMULA_FILE with version $VERSION and SHA256 $SHA256_CHECKSUM"
+
+          # Use sed to replace the version, URL, and SHA256 in the formula file
+          # macOS sed behaves differently, using 'gsed' if available or specific syntax
+          # This example uses standard GNU sed syntax
+          sed -i "s|  url \".*\"|  url \"${TARBALL_URL}\"|" "$FORMULA_FILE"
+          sed -i "s|  sha256 \".*\"|  sha256 \"${SHA256_CHECKSUM}\"|" "$FORMULA_FILE"
+          # Homebrew typically infers version from URL, but sometimes it's explicitly set.
+          # If your formula *explicitly* sets `version`, you might need this:
+          # sed -i "s|  version \".*\"|  version \"${VERSION}\"|" "$FORMULA_FILE"
+
+      - name: Commit and Push Changes
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/your-project.rb
+          git commit -m "chore(homebrew): Update your-project to ${{ steps.get_release_info.outputs.VERSION }}"
+          git push
+
+      # Optional: If you prefer creating a PR instead of direct push
+      # - name: Create Pull Request (Optional)
+      #   uses: peter-evans/create-pull-request@v6
+      #   with:
+      #     token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      #     commit-message: "chore(homebrew): Update your-project to ${{ steps.get_release_info.outputs.VERSION }}"
+      #     title: "chore(homebrew): Update your-project to ${{ steps.get_release_info.outputs.VERSION }}"
+      #     body: "Automatically update Homebrew formula for new release."
+      #     branch: auto-update/your-project-${{ steps.get_release_info.outputs.VERSION }}
+      #     base: main # Target branch in your Homebrew tap
+      #     delete-branch: true
