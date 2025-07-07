@@ -31,7 +31,7 @@ jobs:
         run: docker compose up -d vscode
 
       - name: Init env
-        run: | 
+        run: |
           docker compose exec -T -w /workspace -u root vscode usermod -u $(id -u) vscode
           docker compose exec -T -w /workspace -u root vscode groupmod -g $(id -g) vscode
           docker compose exec -T -w /workspace -u root vscode chown $(id -u):$(id -g) tests/workspace
@@ -47,3 +47,10 @@ jobs:
             -e PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/home/vscode/go/bin:/workspace/bin \
             vscode \
             neon -props "{tag: ${CI_ACTION_REF_NAME}, MODULE: github.com/${CI_REPOSITORY,,}, BY: $(echo ${CI_ACTOR} | tr -d '[]')}" test-int
+
+      - name: Update Homebrew Formula (macOS)
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: lino
+          homebrew-tap: gambhirsharma/homebrew-lino
+          download-url: https://github.com/CGI-FR/LINO/releases/download/v${{ github.ref_name }}/LINO_${{ github.ref_name }}_darwin_amd64.tar.gz
