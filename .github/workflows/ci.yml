@@ -53,4 +53,4 @@ jobs:
         with:
           formula-name: lino
           homebrew-tap: gambhirsharma/homebrew-lino
-          download-url: https://github.com/CGI-FR/LINO/releases/download/v${{CI_REF_NAME}}/LINO_${{ CI_REF_NAME }}_darwin_amd64.tar.gz
+          download-url: https://github.com/CGI-FR/LINO/releases/download/v${CI_REF_NAME}/LINO_${CI_REF_NAME}_darwin_amd64.tar.gz
